@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Currency Converter Pro - Options</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+
+    .option-group {
+      margin-bottom: 25px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+    }
+
+    .option-group h3 {
+      margin-top: 0;
+      color: #495057;
+      font-size: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #495057;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    select:focus, input:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    }
+
+    .button-group {
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 0 10px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .reset-btn {
+      background: #6c757d;
+    }
+
+    .reset-btn:hover {
+      background: #545b62;
+    }
+
+    .status-message {
+      text-align: center;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .status-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .site-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      padding: 10px;
+      background: white;
+    }
+
+    .site-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .site-item:last-child {
+      border-bottom: none;
+    }
+
+    .site-toggle {
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Currency Converter Pro Settings</h1>
+    
+    <div class="option-group">
+      <h3>Base Currency</h3>
+      <label for="baseCurrency">Select your preferred base currency:</label>
+      <select id="baseCurrency">
+        <option value="USD">US Dollar (USD)</option>
+        <option value="EUR">Euro (EUR)</option>
+        <option value="GBP">British Pound (GBP)</option>
+        <option value="JPY">Japanese Yen (JPY)</option>
+        <option value="CAD">Canadian Dollar (CAD)</option>
+        <option value="AUD">Australian Dollar (AUD)</option>
+        <option value="CHF">Swiss Franc (CHF)</option>
+        <option value="CNY">Chinese Yuan (CNY)</option>
+        <option value="INR">Indian Rupee (INR)</option>
+        <option value="KRW">South Korean Won (KRW)</option>
+        <option value="RUB">Russian Ruble (RUB)</option>
+        <option value="BRL">Brazilian Real (BRL)</option>
+        <option value="MXN">Mexican Peso (MXN)</option>
+        <option value="SGD">Singapore Dollar (SGD)</option>
+        <option value="HKD">Hong Kong Dollar (HKD)</option>
+        <option value="NOK">Norwegian Krone (NOK)</option>
+        <option value="SEK">Swedish Krona (SEK)</option>
+        <option value="DKK">Danish Krone (DKK)</option>
+      </select>
+    </div>
+
+    <div class="option-group">
+      <h3>API Configuration</h3>
+      <label for="apiKey">Exchange Rate API Key (optional):</label>
+      <input type="text" id="apiKey" placeholder="Enter your API key for more reliable rates">
+      <small>Get a free API key from <a href="https://exchangerate-api.com/" target="_blank">ExchangeRate-API</a></small>
+    </div>
+
+    <div class="option-group">
+      <h3>Website Management</h3>
+      <label for="currentSite">Current site: <span id="currentSiteUrl"></span></label>
+      <div>
+        <input type="checkbox" id="enableCurrentSite"> Enable conversion for this site
+      </div>
+      
+      <div style="margin-top: 15px;">
+        <label>Disabled sites:</label>
+        <div id="disabledSites" class="site-list">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+
+    <div class="option-group">
+      <h3>Advanced Settings</h3>
+      <label>
+        <input type="checkbox" id="showOriginalOnHover"> Show original currency on hover
+      </label>
+      <label>
+        <input type="checkbox" id="animateConversions"> Animate currency conversions
+      </label>
+      <label for="updateFrequency">Exchange rate update frequency:</label>
+      <select id="updateFrequency">
+        <option value="hourly">Every hour</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
+
+    <div class="button-group">
+      <button id="saveOptions">Save Settings</button>
+      <button id="resetOptions" class="reset-btn">Reset to Default</button>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

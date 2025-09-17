@@ -1,0 +1,92 @@
+/* Global styles for the Currency Converter Pro extension */
+
+.currency-converted {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: 0 2px;
+  transition: all 0.3s ease;
+  position: relative;
+  cursor: help;
+}
+
+.currency-converted:hover {
+  background-color: #fff8e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.converted-value {
+  color: #0066cc;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+/* Tooltip for original value */
+.currency-converted::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.currency-converted:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Animation for newly converted currencies */
+@keyframes currencyConvert {
+  0% {
+    background-color: #d4edda;
+    transform: scale(1.05);
+  }
+  100% {
+    background-color: #fff3cd;
+    transform: scale(1);
+  }
+}
+
+.currency-converted.animate {
+  animation: currencyConvert 0.6s ease-out;
+}
+
+/* Styles for different currency types */
+.currency-converted.usd { border-left: 3px solid #28a745; }
+.currency-converted.eur { border-left: 3px solid #007bff; }
+.currency-converted.gbp { border-left: 3px solid #6f42c1; }
+.currency-converted.jpy { border-left: 3px solid #fd7e14; }
+.currency-converted.cad { border-left: 3px solid #dc3545; }
+.currency-converted.aud { border-left: 3px solid #20c997; }
+
+/* Ensure the extension doesn't interfere with site styles */
+.currency-converted * {
+  box-sizing: content-box;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .currency-converted {
+    display: inline-block;
+    margin: 1px;
+    padding: 1px 4px;
+    font-size: 0.85em;
+  }
+  
+  .converted-value {
+    font-size: 0.8em;
+  }
+}
