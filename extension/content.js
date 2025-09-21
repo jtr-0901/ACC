@@ -5,6 +5,8 @@ class CurrencyDetector {
     this.baseCurrency = 'USD';
     this.enabledSites = {};
     this.processedNodes = new WeakSet();
+    this.processedElements = new WeakSet();
+    this.isProcessing = false;
     
     this.currencyPatterns = {
       USD: { symbols: ['$', 'USD', 'US$'], priority: 1 },
@@ -32,8 +34,11 @@ class CurrencyDetector {
 
   async init() {
     await this.loadSettings();
-    this.setupMutationObserver();
-    this.processPage();
+    if (this.isConversionEnabled()) {
+      this.setupMutationObserver();
+      // Delay initial processing to avoid conflicts
+      setTimeout(() => this.processPage(), 1000);
+    }
   }
 
   async loadSettings() {
@@ -52,20 +57,36 @@ class CurrencyDetector {
   }
 
   setupMutationObserver() {
-    if (!this.isConversionEnabled()) return;
-
     const observer = new MutationObserver((mutations) => {
+      if (this.isProcessing) return;
+      
+      let shouldProcess = false;
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList') {
           mutation.addedNodes.forEach((node) => {
-            if (node.nodeType === Node.TEXT_NODE) {
-              this.processTextNode(node);
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-              this.processElement(node);
+            // Skip our own converted elements
+            if (node.nodeType === Node.ELEMENT_NODE && 
+                (node.classList?.contains('currency-converted') || 
+                 node.querySelector?.('.currency-converted'))) {
+              return;
+            }
+            
+            if (node.nodeType === Node.TEXT_NODE && !this.processedNodes.has(node)) {
+              shouldProcess = true;
+            } else if (node.nodeType === Node.ELEMENT_NODE && !this.processedElements.has(node)) {
+              shouldProcess = true;
             }
           });
         }
       });
+      
+      if (shouldProcess) {
+        // Debounce processing to avoid rapid-fire mutations
+        clearTimeout(this.processingTimeout);
+        this.processingTimeout = setTimeout(() => {
+          this.processNewMutations(mutations);
+        }, 100);
+      }
     });
 
     observer.observe(document.body, {
@@ -74,30 +95,107 @@ class CurrencyDetector {
     });
   }
 
+  processNewMutations(mutations) {
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+    
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          // Skip our own converted elements
+          if (node.nodeType === Node.ELEMENT_NODE && 
+              (node.classList?.contains('currency-converted') || 
+               node.querySelector?.('.currency-converted'))) {
+            return;
+          }
+          
+          if (node.nodeType === Node.TEXT_NODE) {
+            this.processTextNode(node);
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            this.processElement(node);
+          }
+        });
+      }
+    });
+    
+    this.isProcessing = false;
+  }
+
   processPage() {
-    if (!this.isConversionEnabled()) return;
+    if (this.isProcessing || !this.isConversionEnabled()) return;
+    this.isProcessing = true;
 
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
-      null,
+      {
+        acceptNode: (node) => {
+          // Skip already processed nodes and converted elements
+          if (this.processedNodes.has(node)) return NodeFilter.FILTER_REJECT;
+          
+          const parent = node.parentElement;
+          if (parent && (parent.classList.contains('currency-converted') || 
+                        parent.closest('.currency-converted'))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
       false
     );
 
+    const nodesToProcess = [];
     let node;
     while (node = walker.nextNode()) {
-      this.processTextNode(node);
+      nodesToProcess.push(node);
+    }
+
+    // Process nodes in batches to avoid blocking
+    this.processBatch(nodesToProcess, 0);
+  }
+
+  processBatch(nodes, startIndex) {
+    const batchSize = 10;
+    const endIndex = Math.min(startIndex + batchSize, nodes.length);
+    
+    for (let i = startIndex; i < endIndex; i++) {
+      this.processTextNode(nodes[i]);
+    }
+    
+    if (endIndex < nodes.length) {
+      // Process next batch after a short delay
+      setTimeout(() => this.processBatch(nodes, endIndex), 10);
+    } else {
+      this.isProcessing = false;
     }
   }
 
   processElement(element) {
-    if (this.processedNodes.has(element)) return;
-    this.processedNodes.add(element);
+    if (this.processedElements.has(element) || 
+        element.classList?.contains('currency-converted') ||
+        element.closest?.('.currency-converted')) {
+      return;
+    }
+    
+    this.processedElements.add(element);
 
     const walker = document.createTreeWalker(
       element,
       NodeFilter.SHOW_TEXT,
-      null,
+      {
+        acceptNode: (node) => {
+          if (this.processedNodes.has(node)) return NodeFilter.FILTER_REJECT;
+          
+          const parent = node.parentElement;
+          if (parent && (parent.classList.contains('currency-converted') || 
+                        parent.closest('.currency-converted'))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
       false
     );
 
@@ -108,9 +206,21 @@ class CurrencyDetector {
   }
 
   processTextNode(textNode) {
-    if (!textNode.parentNode || this.processedNodes.has(textNode)) return;
+    if (!textNode.parentNode || 
+        this.processedNodes.has(textNode) ||
+        textNode.parentElement?.classList?.contains('currency-converted') ||
+        textNode.parentElement?.closest?.('.currency-converted')) {
+      return;
+    }
     
     const text = textNode.textContent;
+    
+    // Skip if text contains conversion indicators (already processed)
+    if (text.includes('≈') || text.includes('(≈')) {
+      this.processedNodes.add(textNode);
+      return;
+    }
+    
     const currencies = this.detectCurrencies(text);
     
     if (currencies.length > 0) {
@@ -146,7 +256,7 @@ class CurrencyDetector {
           }
 
           if (!overlaps) {
-            const amount = parseFloat(match[2] || match[3] || match[4]);
+            const amount = parseFloat((match[2] || match[3] || match[4] || match[1]).replace(/,/g, ''));
             if (!isNaN(amount) && amount > 0) {
               currencies.push({
                 code,
@@ -173,12 +283,10 @@ class CurrencyDetector {
   createCurrencyRegex(symbol) {
     const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    // Various patterns for currency detection
+    // More precise patterns to avoid matching converted values
     const patterns = [
-      `(${escapedSymbol})\\s*([\\d,]+(?:\\.\\d{2})?)`, // $100.00
-      `([\\d,]+(?:\\.\\d{2})?)\\s*(${escapedSymbol})`, // 100.00 USD
-      `([\\d,]+(?:\\.\\d{2})?)\\s*${escapedSymbol}`, // 100.00$
-      `(${escapedSymbol})([\\d,]+(?:\\.\\d{2})?)` // $100.00 (no space)
+      `(?<!≈)(?<!\\()${escapedSymbol}\\s*([\\d,]+(?:\\.\\d{1,2})?)(?!\\s*\\(≈)`, // $100.00 but not (≈$100.00)
+      `(?<!≈)(?<!\\()([\\d,]+(?:\\.\\d{1,2})?)\\s*${escapedSymbol}(?!\\s*\\(≈)`, // 100.00 USD but not 100.00 USD (≈...)
     ];
 
     return new RegExp(patterns.join('|'), 'gi');
@@ -220,6 +328,12 @@ class CurrencyDetector {
     if (newHTML !== textNode.textContent) {
       const span = document.createElement('span');
       span.innerHTML = newHTML;
+      
+      // Mark the new element as processed
+      span.querySelectorAll('.currency-converted').forEach(el => {
+        this.processedElements.add(el);
+      });
+      
       textNode.parentNode.replaceChild(span, textNode);
     }
   }
@@ -239,7 +353,7 @@ class CurrencyDetector {
     const roundedAmount = Math.round(amount * 100) / 100;
     
     if (currencyCode === 'JPY' || currencyCode === 'KRW') {
-      return `${symbol}${Math.round(amount)}`;
+      return `${symbol}${Math.round(amount).toLocaleString()}`;
     }
     
     return `${symbol}${roundedAmount.toFixed(2)}`;
@@ -251,10 +365,10 @@ class CurrencyDetector {
         action: 'convertCurrency',
         data: { amount, fromCurrency, toCurrency }
       }, (response) => {
-        if (response.success) {
+        if (response && response.success) {
           resolve(response.convertedAmount);
         } else {
-          reject(new Error(response.error));
+          reject(new Error(response ? response.error : 'Failed to convert currency'));
         }
       });
     });
