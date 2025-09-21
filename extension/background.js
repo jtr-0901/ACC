@@ -2,9 +2,7 @@
 
 class CurrencyService {
   constructor() {
-    this.API_KEY = 'YOUR_API_KEY'; // Replace with actual API key
     this.BASE_URL = 'https://api.exchangerate-api.com/v4/latest/';
-    this.FALLBACK_URL = 'https://api.fixer.io/latest'; // Fallback API
     this.CACHE_DURATION = 3600000; // 1 hour in milliseconds
   }
 
@@ -42,22 +40,26 @@ class CurrencyService {
   }
 
   async getCachedRates(baseCurrency) {
-    return new Promise((resolve) => {
-      chrome.storage.local.get([`rates_${baseCurrency}`], (result) => {
-        resolve(result[`rates_${baseCurrency}`] || null);
-      });
-    });
+    try {
+      const result = await chrome.storage.local.get([`rates_${baseCurrency}`]);
+      return result[`rates_${baseCurrency}`] || null;
+    } catch (error) {
+      console.error('Error getting cached rates:', error);
+      return null;
+    }
   }
 
   async cacheRates(baseCurrency, rates) {
-    const cacheData = {
-      rates,
-      timestamp: Date.now()
-    };
-    
-    return new Promise((resolve) => {
-      chrome.storage.local.set({ [`rates_${baseCurrency}`]: cacheData }, resolve);
-    });
+    try {
+      const cacheData = {
+        rates,
+        timestamp: Date.now()
+      };
+      
+      await chrome.storage.local.set({ [`rates_${baseCurrency}`]: cacheData });
+    } catch (error) {
+      console.error('Error caching rates:', error);
+    }
   }
 
   isCacheValid(timestamp) {
@@ -66,21 +68,20 @@ class CurrencyService {
 
   async convertCurrency(amount, fromCurrency, toCurrency) {
     try {
-      const rates = await this.getExchangeRates(toCurrency);
-      
       if (fromCurrency === toCurrency) {
         return amount;
       }
+
+      const rates = await this.getExchangeRates(fromCurrency);
       
-      // If converting from base currency
-      if (rates[fromCurrency]) {
-        return amount / rates[fromCurrency];
+      if (rates && rates[toCurrency]) {
+        return amount * rates[toCurrency];
       }
       
-      // If converting to base currency
-      const baseRates = await this.getExchangeRates(fromCurrency);
-      if (baseRates[toCurrency]) {
-        return amount * baseRates[toCurrency];
+      // Try reverse conversion
+      const reverseRates = await this.getExchangeRates(toCurrency);
+      if (reverseRates && reverseRates[fromCurrency]) {
+        return amount / reverseRates[fromCurrency];
       }
       
       throw new Error(`Conversion rate not found for ${fromCurrency} to ${toCurrency}`);
@@ -93,7 +94,7 @@ class CurrencyService {
 
 const currencyService = new CurrencyService();
 
-// Handle messages from content scripts
+// Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'convertCurrency') {
     const { amount, fromCurrency, toCurrency } = message.data;
@@ -124,28 +125,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Update exchange rates on extension startup
+// Initialize on extension startup
 chrome.runtime.onStartup.addListener(async () => {
   try {
     const result = await chrome.storage.sync.get(['baseCurrency']);
     const baseCurrency = result.baseCurrency || 'USD';
     await currencyService.getExchangeRates(baseCurrency);
+    console.log('Exchange rates updated on startup');
   } catch (error) {
     console.error('Failed to update exchange rates on startup:', error);
   }
 });
 
-// Update exchange rates daily
-chrome.alarms.create('updateRates', { delayInMinutes: 1440 }); // 24 hours
-
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'updateRates') {
-    try {
-      const result = await chrome.storage.sync.get(['baseCurrency']);
-      const baseCurrency = result.baseCurrency || 'USD';
-      await currencyService.getExchangeRates(baseCurrency);
-    } catch (error) {
-      console.error('Failed to update exchange rates:', error);
-    }
+// Also initialize when extension is installed
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    const result = await chrome.storage.sync.get(['baseCurrency']);
+    const baseCurrency = result.baseCurrency || 'USD';
+    await currencyService.getExchangeRates(baseCurrency);
+    console.log('Exchange rates updated on install');
+  } catch (error) {
+    console.error('Failed to update exchange rates on install:', error);
   }
 });

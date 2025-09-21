@@ -7,11 +7,14 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "alarms"
   ],
   
   "host_permissions": [
-    "https://api.exchangerate-api.com/*"
+    "https://api.exchangerate-api.com/*",
+    "https://*/*",
+    "http://*/*"
   ],
   
   "content_scripts": [
